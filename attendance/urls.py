@@ -1,10 +1,10 @@
 from django.urls import path
-
 from .views import (
-    TodayAttendanceAPIView,
     AttendanceExceptionListAPIView,
-    PendingExceptionAPIView,
+    AttendanceDashboardAPIView,
     ExceptionDecisionAPIView,
+    PendingExceptionAPIView,
+    TodayAttendanceAPIView,
 )
 
 
@@ -31,5 +31,11 @@ urlpatterns = [
         "exceptions/<int:exception_id>/decision/",
         ExceptionDecisionAPIView.as_view(),
         name="attendance-exception-decision",
+    ),
+
+    path(
+        "dashboard/",
+        AttendanceDashboardAPIView.as_view(),
+        name="attendance-dashboard",
     ),
 ]

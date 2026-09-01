@@ -1,0 +1,209 @@
+from datetime import date
+
+from attendance.models import (
+    DailyAttendance,
+    AttendanceException,
+    AttendanceEvent,
+    BiometricDevice,
+)
+
+from employees.models import Department
+
+
+class DashboardService:
+    """
+    Workforce Operations Dashboard service.
+    """
+
+    @staticmethod
+    def get_dashboard():
+        today = date.today()
+
+        return {
+            "summary": DashboardService.get_summary(today),
+            "department_readiness": DashboardService.get_department_readiness(today),
+            "workforce_action_center": DashboardService.get_absent_employees(today),
+            "late_employees": DashboardService.get_late_employees(today),
+            "attendance_exceptions": DashboardService.get_exceptions(today),
+            "recent_events": DashboardService.get_recent_events(),
+            "device_status": DashboardService.get_device_status(),
+            "hostel_absentees": DashboardService.get_hostel_absentees(today),
+        }
+
+    @staticmethod
+    def get_summary(today):
+        attendance = DailyAttendance.objects.select_related(
+            "shift"
+        ).filter(
+            date=today
+        )
+
+        return {
+            "present": attendance.filter(
+                status="present"
+            ).count(),
+
+            "late": attendance.filter(
+                status="late"
+            ).count(),
+
+            "absent": attendance.filter(
+                status="absent"
+            ).count(),
+
+            "on_leave": attendance.filter(
+                status="leave"
+            ).count(),
+
+            "night_shift": attendance.filter(
+                shift__is_overnight=True
+            ).count(),
+
+            "overtime": attendance.filter(
+                overtime_minutes__gt=0
+            ).count(),
+        }
+    @staticmethod
+    def get_absent_employees(today):
+
+        attendance = (
+            DailyAttendance.objects
+            .select_related(
+                "employee",
+                "employee__department",
+                "shift",
+            )
+            .filter(
+                date=today,
+                status="absent",
+            )
+            .order_by(
+                "employee__first_name",
+            )
+        )
+
+        results = []
+
+        for record in attendance:
+
+            employee = record.employee
+
+            results.append({
+                "employee_id": employee.id,
+                "employee_number": employee.employee_id,
+                "employee_name": employee.full_name,
+                "department": (
+                    employee.department.name
+                    if employee.department
+                    else None
+                ),
+                "shift": (
+                    record.shift.name
+                    if record.shift
+                    else None
+                ),
+                "hostel": employee.lives_in_company_hostel,
+                "room": employee.hostel_room_number,
+                "status": record.status,
+            })
+
+        return results
+
+
+    @staticmethod
+    def get_department_readiness(today):
+
+        departments = Department.objects.all().order_by("name")
+
+        results = []
+
+        for department in departments:
+
+            present = (
+                DailyAttendance.objects.filter(
+                    date=today,
+                    employee__department=department,
+                    status="present",
+                ).count()
+            )
+
+            required = department.required_staff
+
+            short = max(required - present, 0)
+
+            readiness = (
+                round((present / required) * 100, 1)
+                if required > 0
+                else 0
+            )
+
+            results.append(
+                {
+                    "department": department.name,
+                    "required": required,
+                    "present": present,
+                    "short": short,
+                    "readiness": readiness,
+                }
+            )
+
+        return results
+
+
+
+    @staticmethod
+    def get_hostel_absentees(today):
+
+        attendance = (
+            DailyAttendance.objects
+            .select_related(
+                "employee",
+                "employee__department",
+            )
+            .filter(
+                date=today,
+                status="absent",
+                employee__lives_in_company_hostel=True,
+            )
+            .order_by(
+                "employee__first_name",
+            )
+        )
+
+        results = []
+
+        for record in attendance:
+
+            employee = record.employee
+
+            results.append(
+                {
+                    "employee_id": employee.id,
+                    "employee_name": employee.full_name,
+                    "department": (
+                        employee.department.name
+                        if employee.department
+                        else None
+                    ),
+                    "room": employee.hostel_room_number,
+                }
+            )
+
+        return results
+
+
+    @staticmethod
+    def get_late_employees(today):
+        return []
+
+    @staticmethod
+    def get_exceptions(today):
+        return []
+
+    @staticmethod
+    def get_recent_events():
+        return []
+
+    @staticmethod
+    def get_device_status():
+        return []

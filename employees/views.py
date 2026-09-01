@@ -31,6 +31,8 @@ from .importers import (
     validate_employee_rows,
     normalize_value,
 )
+from audit.models import AuditSeverity
+from audit.services import AuditService
 
 class DepartmentListAPIView(APIView):
 
@@ -209,6 +211,18 @@ class EmployeeListCreateAPIView(APIView):
 
         employee = serializer.save()
 
+        AuditService.log(
+            event_type="employee.created",
+            module="employees",
+            employee=employee,
+            actor=request.user,
+            object=employee,
+            severity=AuditSeverity.SUCCESS,
+            title="Employee created",
+            description=f"Employee {employee.full_name} was created.",
+            metadata={"employee_id": employee.employee_id},
+        )
+
         output = EmployeeSerializer(
             employee
         )
@@ -312,7 +326,23 @@ class EmployeeDetailAPIView(APIView):
             raise_exception=True
         )
 
+        updated_fields = list(serializer.validated_data.keys())
         employee = serializer.save()
+
+        AuditService.log(
+            event_type="employee.updated",
+            module="employees",
+            employee=employee,
+            actor=request.user,
+            object=employee,
+            severity=AuditSeverity.SUCCESS,
+            title="Employee updated",
+            description=f"Employee {employee.full_name} was updated.",
+            metadata={
+                "employee_id": employee.employee_id,
+                "updated_fields": updated_fields,
+            },
+        )
 
         return Response(
             EmployeeSerializer(

@@ -7,6 +7,11 @@ from django.db import models
 class Department(models.Model):
     name = models.CharField(max_length=120, unique=True)
     description = models.TextField(blank=True)
+    required_staff = models.PositiveIntegerField(
+        default=0,
+        help_text="Normal number of employees required for daily operations."
+    )
+
 
     def __str__(self):
         return self.name
@@ -22,6 +27,21 @@ class Position(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.department.name}"
+
+
+class EmploymentType(models.TextChoices):
+    PERMANENT = "permanent", "Permanent"
+    CONTRACT = "contract", "Contract"
+    CASUAL = "casual", "Casual"
+    INTERN = "intern", "Intern"
+    NYSC = "nysc", "NYSC"
+    EXPATRIATE = "expatriate", "Expatriate"
+
+
+class EmploymentCategory(models.TextChoices):
+    STAFF = "staff", "Staff"
+    MANAGEMENT = "management", "Management"
+    EXECUTIVE = "executive", "Executive"
 
 
 class Employee(models.Model):
@@ -78,6 +98,18 @@ class Employee(models.Model):
     employment_date = models.DateField(
         null=True,
         blank=True,
+    )
+
+    employment_type = models.CharField(
+        max_length=20,
+        choices=EmploymentType.choices,
+        default=EmploymentType.PERMANENT,
+    )
+
+    employment_category = models.CharField(
+        max_length=20,
+        choices=EmploymentCategory.choices,
+        default=EmploymentCategory.STAFF,
     )
 
     basic_salary = models.DecimalField(
@@ -192,4 +224,4 @@ class BiometricIdentity(models.Model):
             f"{self.employee.employee_id} - "
             f"{self.system} - "
             f"{self.external_user_id}"
-        )  
+        )

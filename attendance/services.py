@@ -9,6 +9,8 @@ from .models import (
     AttendanceException,
     ShiftAssignment,
 )
+from audit.models import AuditSeverity
+from audit.services import AuditService
 
 
 from django.db.models import Q
@@ -105,7 +107,7 @@ def process_employee_attendance(employee, work_date):
         .order_by("timestamp")
     )
 
-    daily_attendance, _ = DailyAttendance.objects.get_or_create(
+    daily_attendance, created = DailyAttendance.objects.get_or_create(
         employee=employee,
         date=work_date,
         defaults={
@@ -114,6 +116,11 @@ def process_employee_attendance(employee, work_date):
             "scheduled_end": scheduled_end,
         },
     )
+
+    previous_clock_in = daily_attendance.actual_clock_in
+    previous_clock_out = daily_attendance.actual_clock_out
+    previous_status = daily_attendance.status
+    previous_late_minutes = daily_attendance.late_minutes
 
     daily_attendance.shift = shift
     daily_attendance.scheduled_start = scheduled_start
@@ -198,6 +205,55 @@ def process_employee_attendance(employee, work_date):
         daily_attendance.status = "present"
 
     daily_attendance.save()
+
+    if created or previous_clock_in != actual_clock_in:
+        AuditService.log(
+            event_type="attendance.clock_in",
+            module="attendance",
+            employee=employee,
+            object=daily_attendance,
+            severity=AuditSeverity.SUCCESS,
+            title="Clock in recorded",
+            description=f"Clock in recorded for {employee.full_name}.",
+            metadata={
+                "attendance_date": work_date.isoformat(),
+                "clock_in": actual_clock_in.isoformat(),
+            },
+        )
+
+    if created or previous_clock_out != actual_clock_out:
+        AuditService.log(
+            event_type="attendance.clock_out",
+            module="attendance",
+            employee=employee,
+            object=daily_attendance,
+            severity=AuditSeverity.SUCCESS,
+            title="Clock out recorded",
+            description=f"Clock out recorded for {employee.full_name}.",
+            metadata={
+                "attendance_date": work_date.isoformat(),
+                "clock_out": actual_clock_out.isoformat(),
+            },
+        )
+
+    if late_minutes > 0 and (
+        created
+        or previous_status != "late"
+        or previous_late_minutes != late_minutes
+    ):
+        AuditService.log(
+            event_type="attendance.late",
+            module="attendance",
+            employee=employee,
+            object=daily_attendance,
+            severity=AuditSeverity.WARNING,
+            title="Late arrival recorded",
+            description=f"{employee.full_name} arrived late.",
+            metadata={
+                "attendance_date": work_date.isoformat(),
+                "late_minutes": late_minutes,
+            },
+        )
 
     if late_minutes > 0:
         AttendanceException.objects.get_or_create(

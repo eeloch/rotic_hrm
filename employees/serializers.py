@@ -9,6 +9,41 @@ from .models import (
 )
 
 
+def calculate_years_of_service(employee):
+    if not employee.employment_date:
+        return None
+
+    today = date.today()
+    years = today.year - employee.employment_date.year
+
+    if (today.month, today.day) < (
+        employee.employment_date.month,
+        employee.employment_date.day,
+    ):
+        years -= 1
+
+    return years
+
+
+def service_award_for_years(years):
+    if years is None or years < 5:
+        return None
+
+    if years < 10:
+        return "5 Years"
+
+    if years < 15:
+        return "10 Years"
+
+    if years < 20:
+        return "15 Years"
+
+    if years < 25:
+        return "20 Years"
+
+    return "25 Years"
+
+
 class DepartmentSerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -17,6 +52,7 @@ class DepartmentSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "description",
+            "required_staff",
         ]
 
 
@@ -34,10 +70,6 @@ class PositionSerializer(serializers.ModelSerializer):
             "name",
             "department",
             "department_name",
-            "hostel",
-            "biometric",
-            "years_of_service",
-
         ]
 
 
@@ -65,6 +97,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
 
     years_of_service = serializers.SerializerMethodField()
 
+    service_award_level = serializers.SerializerMethodField()
+
 
     def get_biometric(self, employee):
 
@@ -85,27 +119,12 @@ class EmployeeSerializer(serializers.ModelSerializer):
 
 
     def get_years_of_service(self, employee):
+        return calculate_years_of_service(employee)
 
-        if not employee.employment_date:
-            return None
-
-        today = date.today()
-
-        years = (
-            today.year
-            - employee.employment_date.year
+    def get_service_award_level(self, employee):
+        return service_award_for_years(
+            calculate_years_of_service(employee)
         )
-
-        if (
-            today.month,
-            today.day,
-        ) < (
-            employee.employment_date.month,
-            employee.employment_date.day,
-        ):
-            years -= 1
-
-        return years
 
     def get_hostel(self, employee):
         return {
@@ -137,6 +156,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
 
             "date_of_birth",
             "employment_date",
+            "employment_type",
+            "employment_category",
 
             "basic_salary",
 
@@ -146,9 +167,14 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "status",
 
             "current_shift",
+            "hostel",
+            "biometric",
+            "years_of_service",
+            "service_award_level",
 
             "created_at",
             "updated_at",
+
         ]
 
     def get_current_shift(self, employee):
@@ -198,6 +224,8 @@ class EmployeeCreateUpdateSerializer(
 
             "date_of_birth",
             "employment_date",
+            "employment_type",
+            "employment_category",
 
             "basic_salary",
 
@@ -289,6 +317,10 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
 
     full_name = serializers.SerializerMethodField()
 
+    years_of_service = serializers.SerializerMethodField()
+
+    service_award_level = serializers.SerializerMethodField()
+
     class Meta:
         model = Employee
 
@@ -304,6 +336,10 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
             "phone",
             "email",
             "employment_date",
+            "employment_type",
+            "employment_category",
+            "years_of_service",
+            "service_award_level",
             "basic_salary",
             "status",
             "hostel",
@@ -343,3 +379,11 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
             "system": biometric.biometric_system,
             "source": biometric.biometric_source,
         }
+
+    def get_years_of_service(self, obj):
+        return calculate_years_of_service(obj)
+
+    def get_service_award_level(self, obj):
+        return service_award_for_years(
+            calculate_years_of_service(obj)
+        )
